@@ -1,366 +1,485 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Seguimiento FEN 2026-2027 - PNC / MVCS</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js para Reportes Graficos -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- FontAwesome para Iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .bg-mvcs-overlay {
-            background: linear-gradient(90deg, rgba(110, 15, 25, 0.93) 0%, rgba(139, 29, 36, 0.88) 50%, rgba(80, 10, 18, 0.95) 100%),
-                        url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1200&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento FEN 2026-2027</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="config.js"></script>
+<style>
+  .bg-mvcs { background: linear-gradient(90deg, #6e0f19 0%, #8b1d24 50%, #500a12 100%); }
+  th { position: sticky; top: 0; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:9999px; font-size:10px; font-weight:700; white-space:nowrap; }
+  @media print {
+    header .no-print, #filtros, nav, .no-print { display: none !important; }
+    .tabview { display: block !important; break-inside: avoid; }
+    body { background: #fff; }
+  }
+</style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased">
 
-    <!-- HEADER / BANNER INSTITUCIONAL COMPACTO -->
-    <header class="bg-mvcs-overlay text-white shadow-md border-b-2 border-red-900">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
-            
-            <!-- LOGO INSTITUCIONAL + TITULO -->
-            <div class="flex items-center gap-4">
-                <div class="bg-white p-1.5 rounded shadow-md flex items-center justify-center">
-                    <div class="flex items-center gap-2 px-2 py-1 text-slate-900 font-bold text-xs uppercase tracking-tighter">
-                        <span class="bg-red-700 text-white px-2 py-0.5 rounded">PERÚ</span>
-                        <span class="text-[11px] leading-none text-slate-700">Ministerio de Vivienda,<br>Construcción y Saneamiento</span>
-                    </div>
-                </div>
-                <div class="border-l border-red-400/40 pl-4">
-                    <h1 class="text-xl font-bold tracking-tight text-white leading-tight">Sistema de Seguimiento FEN 2026-2027</h1>
-                    <p class="text-xs text-red-100/90">Programa Nacional de Saneamiento (PNC) - Ministerio de Vivienda, Construcción y Saneamiento</p>
-                </div>
-            </div>
+<header class="bg-mvcs text-white shadow-md">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-bold leading-tight">Sistema de Seguimiento FEN 2026-2027</h1>
+      <p class="text-xs text-red-100/90">Programa Nuestras Ciudades (PNC) · Ministerio de Vivienda, Construcción y Saneamiento · RM N° 363-2026-VIVIENDA</p>
+    </div>
+    <div class="flex items-center gap-3 text-xs">
+      <div class="text-right">
+        <div class="text-[10px] text-red-200 uppercase tracking-wider font-semibold">Fecha de corte</div>
+        <div id="fechaCorte" class="bg-red-950/80 px-2.5 py-0.5 rounded font-mono border border-red-700/50">—</div>
+      </div>
+      <div class="text-right hidden sm:block">
+        <div class="text-[10px] text-red-200 uppercase tracking-wider font-semibold">Fuente</div>
+        <div id="fuente" class="bg-red-950/80 px-2.5 py-0.5 rounded border border-red-700/50">—</div>
+      </div>
+      <button id="btnRefrescar" class="no-print bg-red-950/70 hover:bg-red-950 px-3 py-2 rounded border border-red-700 font-semibold"><i class="fa-solid fa-rotate"></i> Actualizar</button>
+      <button id="btnExcel" class="no-print bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded font-semibold"><i class="fa-solid fa-file-excel"></i> Exportar Excel</button>
+      <button onclick="window.print()" class="no-print bg-red-950/70 hover:bg-red-950 px-3 py-2 rounded border border-red-700 font-semibold"><i class="fa-solid fa-print"></i> PDF</button>
+    </div>
+  </div>
+  <nav class="bg-red-950/60 border-t border-red-800/50">
+    <div class="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto" id="tabs"></div>
+  </nav>
+</header>
 
-            <!-- CONTROLES Y EXPORTACION -->
-            <div class="flex items-center gap-3">
-                <div class="text-right hidden sm:block">
-                    <div class="text-[10px] text-red-200 uppercase tracking-wider font-semibold">Fecha de Corte:</div>
-                    <div class="bg-red-950/80 px-2.5 py-0.5 rounded text-xs font-mono border border-red-700/50 text-white">18/09/2026</div>
-                </div>
-                <button onclick="alert('Exportando matriz completa a Excel...')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded shadow flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-file-excel"></i> Exportar Excel
-                </button>
-                <button onclick="alert('Generando Reporte Ejecutivo PDF...')" class="bg-red-800 hover:bg-red-900 text-white text-xs font-semibold px-3 py-2 rounded shadow flex items-center gap-1.5 transition border border-red-700">
-                    <i class="fa-solid fa-file-pdf"></i> Exportar PDF
-                </button>
-            </div>
+<div id="aviso" class="hidden max-w-7xl mx-auto mt-3 mx-4 px-4 py-2 rounded bg-amber-50 border border-amber-300 text-amber-900 text-xs"></div>
+
+<main class="max-w-7xl mx-auto px-4 py-5 space-y-4">
+
+  <!-- Filtros globales -->
+  <section id="filtros" class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center text-xs">
+    <span class="font-semibold text-slate-700"><i class="fa-solid fa-filter text-red-700"></i> Filtros</span>
+    <select id="fUbo" class="border border-slate-300 rounded px-2 py-1.5 bg-slate-50"></select>
+    <select id="fMod" class="border border-slate-300 rounded px-2 py-1.5 bg-slate-50"></select>
+    <select id="fComp" class="border border-slate-300 rounded px-2 py-1.5 bg-slate-50"></select>
+    <select id="fEst" class="border border-slate-300 rounded px-2 py-1.5 bg-slate-50"></select>
+    <button id="fLimpiar" class="text-red-800 hover:underline font-semibold">Limpiar</button>
+    <span id="fInfo" class="ml-auto text-slate-500"></span>
+  </section>
+
+  <!-- TAB: Resumen -->
+  <section id="tab-resumen" class="tabview space-y-4">
+    <div id="kpis" class="grid grid-cols-2 lg:grid-cols-6 gap-3"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <h3 class="text-xs font-bold text-slate-700 uppercase mb-1">Ejecución presupuestal por específica de gasto (S/)</h3>
+        <p id="notaPim" class="text-[11px] text-slate-500 mb-2"></p>
+        <div class="h-72"><canvas id="chPres"></canvas></div>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <h3 class="text-xs font-bold text-slate-700 uppercase mb-1">Requerimientos (ID_REQ) por estado del proceso</h3>
+        <p class="text-[11px] text-slate-500 mb-2">Se cuenta una vez por requerimiento (fila cabecera).</p>
+        <div class="h-72"><canvas id="chEstados"></canvas></div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+      <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Control por específica de gasto (vista de tabla del gráfico)</h3>
+      <div class="overflow-x-auto"><table class="w-full text-xs" id="tblEsp"></table></div>
+    </div>
+
+    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+      <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Avance por UBO</h3>
+      <div class="overflow-x-auto"><table class="w-full text-xs" id="tblUbo"></table></div>
+    </div>
+  </section>
+
+  <!-- TAB: Puntos críticos -->
+  <section id="tab-pc" class="tabview hidden bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <h3 class="text-xs font-bold text-slate-700 uppercase">Puntos críticos</h3>
+      <span id="pcResumen" class="text-xs text-slate-500"></span>
+      <input id="pcBuscar" placeholder="Buscar ID, distrito, FTR, equipo…" class="ml-auto border border-slate-300 rounded px-2 py-1.5 text-xs w-64">
+    </div>
+    <div class="overflow-auto max-h-[70vh]"><table class="w-full text-xs" id="tblPc"></table></div>
+  </section>
+
+  <!-- TAB: Requerimientos -->
+  <section id="tab-req" class="tabview hidden bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <h3 class="text-xs font-bold text-slate-700 uppercase">Requerimientos (un registro por ID_REQ)</h3>
+      <span id="reqResumen" class="text-xs text-slate-500"></span>
+      <input id="reqBuscar" placeholder="Buscar ID_REQ, descripción, pedido, CCP…" class="ml-auto border border-slate-300 rounded px-2 py-1.5 text-xs w-64">
+    </div>
+    <div class="overflow-auto max-h-[70vh]"><table class="w-full text-xs" id="tblReq"></table></div>
+  </section>
+
+  <!-- TAB: Calidad -->
+  <section id="tab-cal" class="tabview hidden space-y-4">
+    <div id="calCards" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <h3 class="text-xs font-bold text-slate-700 uppercase mb-2">Observaciones por usuario que actualizó</h3>
+        <table class="w-full text-xs" id="tblUsr"></table>
+      </div>
+      <div class="lg:col-span-2 bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+        <div class="flex items-center gap-3 mb-2">
+          <h3 class="text-xs font-bold text-slate-700 uppercase">Detalle de observaciones</h3>
+          <select id="calTipo" class="ml-auto border border-slate-300 rounded px-2 py-1 text-xs bg-slate-50"></select>
+          <button id="calExcel" class="text-xs text-emerald-700 font-semibold hover:underline"><i class="fa-solid fa-file-excel"></i> Excel</button>
         </div>
+        <div class="overflow-auto max-h-[60vh]"><table class="w-full text-xs" id="tblCal"></table></div>
+      </div>
+    </div>
+  </section>
+</main>
 
-        <!-- NAVEGACIÓN PRINCIPAL -->
-        <div class="bg-red-950/60 border-t border-red-800/50">
-            <div class="max-w-7xl mx-auto px-4 flex gap-2">
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="px-4 py-2.5 text-xs font-semibold text-white border-b-2 border-white flex items-center gap-2 bg-red-900/40">
-                    <i class="fa-solid fa-chart-pie"></i> Dashboard Ejecutivo
-                </button>
-                <button onclick="switchTab('formulario')" id="nav-formulario" class="px-4 py-2.5 text-xs font-semibold text-red-200 hover:text-white border-b-2 border-transparent hover:border-red-400 flex items-center gap-2">
-                    <i class="fa-solid fa-pen-to-square"></i> Registro / Edición FEN
-                </button>
-                <button onclick="switchTab('matriz')" id="nav-matriz" class="px-4 py-2.5 text-xs font-semibold text-red-200 hover:text-white border-b-2 border-transparent hover:border-red-400 flex items-center gap-2">
-                    <i class="fa-solid fa-table"></i> Matriz de 55 Puntos Críticos
-                </button>
-            </div>
-        </div>
-    </header>
+<!-- Modal detalle PC -->
+<div id="modal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+  <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[85vh] overflow-auto p-5">
+    <div class="flex items-start gap-3 mb-3">
+      <div id="modalTitulo" class="text-sm font-bold text-slate-800"></div>
+      <button id="modalCerrar" class="ml-auto text-slate-500 hover:text-slate-900"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="modalCuerpo" class="text-xs"></div>
+  </div>
+</div>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
+<script>
+/* ============ Utilidades ============ */
+const CFG = Object.assign({ API_URL: "", API_TOKEN: "", DATA_URL: "data.json", REFRESH_MIN: 0 }, window.FEN_CONFIG || {});
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nf0 = new Intl.NumberFormat("es-PE", { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const S = (n) => "S/ " + nf0.format(n || 0);
+const S2 = (n) => nf2.format(n || 0);
+const pct = (a, b) => (b ? (100 * a / b).toFixed(1) + "%" : "—");
+const sum = (arr, k) => arr.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+const ESP_LABEL = { "2.3.2.7.13.98": "Alquiler de maquinaria", "2.3.2.7.14.98": "Locadores", "2.3.1.3.1.1": "Combustible",
+  "2.3.1.11.1.4": "Repuestos y accesorios", "2.3.1.3.1.3": "Aceites y lubricantes", "2.3.2.4.7.1": "Mantenimiento" };
+// Series: slots 1-3 de la paleta validada; PIM en neutro (es la referencia, no una serie de identidad).
+const COL = { pim: "#b8b7ae", est: "#2a78d6", cert: "#eb6834", dev: "#1baf7a", bar: "#2a78d6" };
 
-        <!-- VISTA 1: DASHBOARD EJECUTIVO DE REPORTES -->
-        <section id="view-dashboard" class="space-y-6">
-            
-            <!-- TARJETAS KPIS -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <div class="text-xs text-slate-500 uppercase font-semibold">PIM Asignado RM N° 363</div>
-                    <div class="text-2xl font-bold text-slate-800 my-1">S/ 25,500,000</div>
-                    <div class="text-[11px] text-emerald-600 font-medium"><i class="fa-solid fa-check-circle"></i> Marco Presupuestal 100% Habilitado</div>
-                </div>
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <div class="text-xs text-slate-500 uppercase font-semibold">Monto Certificado</div>
-                    <div class="text-2xl font-bold text-blue-700 my-1">S/ 18,340,500</div>
-                    <div class="text-[11px] text-blue-600 font-medium">71.9% de Avance de Certificación</div>
-                </div>
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <div class="text-xs text-slate-500 uppercase font-semibold">Monto Devengado</div>
-                    <div class="text-2xl font-bold text-indigo-700 my-1">S/ 12,150,200</div>
-                    <div class="text-[11px] text-indigo-600 font-medium">47.6% de Ejecución Financiera</div>
-                </div>
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <div class="text-xs text-slate-500 uppercase font-semibold">Puntos Críticos Atendidos</div>
-                    <div class="text-2xl font-bold text-emerald-700 my-1">38 / 55</div>
-                    <div class="text-[11px] text-emerald-600 font-medium">69.0% de Intervenciones FTR</div>
-                </div>
-            </div>
+let DATA = null, ROWS = [], REQINFO = {}, CHARTS = {}, TAB = "resumen", ISSUES = [];
+const FILT = { ubo: "", mod: "", comp: "", est: "" };
 
-            <!-- FILTROS RAPIDOS DE REPORTE -->
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <i class="fa-solid fa-filter text-red-700"></i> Filtros de Reporte:
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <select class="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-slate-50">
-                        <option>Todas las UBO / Regiones</option>
-                        <option>UBO Piura</option>
-                        <option>UBO Lambayeque</option>
-                        <option>UBO Tumbes</option>
-                    </select>
-                    <select class="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-slate-50">
-                        <option>Todas las Modalidades</option>
-                        <option>Administración Directa</option>
-                        <option>Encargo</option>
-                        <option>Convocatoria</option>
-                    </select>
-                    <select class="text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-slate-50">
-                        <option>Todos los Estados SIGA</option>
-                        <option>Aprobado / Contratado</option>
-                        <option>En Tramite</option>
-                        <option>Pendiente Requerimiento</option>
-                    </select>
-                </div>
-            </div>
+/* ============ Carga de datos ============ */
+async function cargar() {
+  let usoApi = false, aviso = "";
+  try {
+    if (CFG.API_URL) {
+      const r = await fetch(CFG.API_URL + "?token=" + encodeURIComponent(CFG.API_TOKEN), { redirect: "follow" });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "Respuesta inválida");
+      DATA = j; usoApi = true;
+    }
+  } catch (e) { aviso = "No se pudo leer la matriz en vivo (" + e.message + "). Se muestran los datos de respaldo."; }
+  if (!DATA) {
+    const r = await fetch(CFG.DATA_URL + "?v=" + Date.now());
+    DATA = await r.json();
+    if (!CFG.API_URL) aviso = "Modo demostración: datos del archivo " + CFG.DATA_URL + " (Excel del " + DATA.meta.generado.slice(0, 10) + "). Configure API_URL en config.js para leer la matriz en vivo.";
+  }
+  ROWS = DATA.rows;
+  // Datos del proceso: se toman de la fila cabecera de cada ID_REQ (las demás filas solo los copian)
+  REQINFO = {};
+  ROWS.forEach((r) => { if (r.id_req && (r.cabecera === "Sí" || !REQINFO[r.id_req])) REQINFO[r.id_req] = r; });  // si falta la fila cabecera (ej. RQ-R04) se usa la primera
+  ROWS.forEach((r) => {
+    const h = REQINFO[r.id_req] || r;
+    r._estado = h.estado_proceso || "Sin estado registrado";
+    r._proc = h.procedimiento || null;
+  });
+  $("fechaCorte").textContent = DATA.params.fecha_corte.split("-").reverse().join("/");
+  $("fuente").textContent = (usoApi ? "Google Sheets" : "Respaldo (Excel)") + " · " + DATA.meta.generado.slice(5, 16);
+  const av = $("aviso"); av.textContent = aviso; av.classList.toggle("hidden", !aviso);
+  iniciarFiltros(); render();
+}
 
-            <!-- GRAFICOS Y REPORTES -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <h3 class="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center justify-between">
-                        <span>Ejecución Presupuestal por Clasificador (S/)</span>
-                        <i class="fa-solid fa-chart-bar text-slate-400"></i>
-                    </h3>
-                    <div class="h-64">
-                        <canvas id="chartPresupuesto"></canvas>
-                    </div>
-                </div>
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <h3 class="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center justify-between">
-                        <span>Estado de Requerimientos en Logística / SIGA</span>
-                        <i class="fa-solid fa-chart-pie text-slate-400"></i>
-                    </h3>
-                    <div class="h-64 flex items-center justify-center">
-                        <canvas id="chartEstados"></canvas>
-                    </div>
-                </div>
-            </div>
-        </section>
+/* ============ Filtros ============ */
+function iniciarFiltros() {
+  const fill = (id, label, vals, cur) => {
+    $(id).innerHTML = `<option value="">${label}</option>` + vals.map((v) => `<option ${v === cur ? "selected" : ""}>${esc(v)}</option>`).join("");
+  };
+  fill("fUbo", "Todas las UBO", uniq(ROWS.map((r) => r.ubo)).sort(), FILT.ubo);
+  fill("fMod", "Todas las modalidades", uniq(ROWS.map((r) => r.modalidad)), FILT.mod);
+  fill("fComp", "Todos los componentes", uniq(ROWS.map((r) => r.componente)), FILT.comp);
+  fill("fEst", "Todos los estados", uniq(ROWS.map((r) => r._estado)).sort(), FILT.est);
+}
+[["fUbo", "ubo"], ["fMod", "mod"], ["fComp", "comp"], ["fEst", "est"]].forEach(([id, k]) => $(id).addEventListener("change", (e) => { FILT[k] = e.target.value; render(); }));
+$("fLimpiar").onclick = () => { Object.keys(FILT).forEach((k) => (FILT[k] = "")); iniciarFiltros(); render(); };
+const filtradas = () => ROWS.filter((r) => (!FILT.ubo || r.ubo === FILT.ubo) && (!FILT.mod || r.modalidad === FILT.mod) &&
+  (!FILT.comp || r.componente === FILT.comp) && (!FILT.est || r._estado === FILT.est));
 
-        <!-- VISTA 2: FORMULARIO DE REGISTRO/EDICION -->
-        <section id="view-formulario" class="hidden space-y-6">
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                <div class="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
-                    <h2 class="text-sm font-bold uppercase tracking-wide flex items-center gap-2">
-                        <i class="fa-solid fa-file-pen text-red-400"></i> Formulario de Carga de Requerimientos (Matriz FEN)
-                    </h2>
-                    <span class="text-xs bg-slate-700 px-2.5 py-1 rounded text-slate-300">ID_REQ: REQ-2026-089</span>
-                </div>
+/* ============ Render principal ============ */
+function render() {
+  const F = filtradas();
+  $("fInfo").textContent = F.length + " de " + ROWS.length + " filas";
+  renderKpis(F); renderPres(F); renderEstados(F); renderTablaEsp(F); renderUbo(F);
+  renderPc(F); renderReq(F); renderCalidad(F);
+}
 
-                <form class="p-6 space-y-6" onsubmit="event.preventDefault(); alert('Requerimiento registrado correctamente.');">
-                    
-                    <!-- BLOQUE 1: PUNTO CRÍTICO Y UBICACIÓN -->
-                    <div>
-                        <h3 class="text-xs font-bold text-red-800 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200">
-                            1. Punto Crítico e Intervención
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">UBO / Región</label>
-                                <select class="w-full border border-slate-300 rounded p-2 bg-slate-50">
-                                    <option>UBO Piura</option>
-                                    <option>UBO Lambayeque</option>
-                                    <option>UBO Tumbes</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Departamento</label>
-                                <input type="text" value="PIURA" class="w-full border border-slate-300 rounded p-2 bg-slate-100" readonly>
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Provincia / Distrito</label>
-                                <input type="text" value="SULLANA / SULLANA" class="w-full border border-slate-300 rounded p-2">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Ficha Técnica (FTR)</label>
-                                <input type="text" value="FTR-055-2026-PNC" class="w-full border border-slate-300 rounded p-2 font-semibold text-slate-800">
-                            </div>
-                        </div>
-                    </div>
+function pimFiltrado() {
+  // El PIM se distribuye por modalidad y componente (no por UBO).
+  return DATA.marco.filter((m) => (!FILT.mod || m.modalidad === FILT.mod) && (!FILT.comp || m.componente === FILT.comp));
+}
 
-                    <!-- BLOQUE 2: DETALLE DEL REQUERIMIENTO -->
-                    <div>
-                        <h3 class="text-xs font-bold text-red-800 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200">
-                            2. Especificación del Requerimiento
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Clasificador / Específica</label>
-                                <select class="w-full border border-slate-300 rounded p-2 bg-slate-50">
-                                    <option>2.3.2 7.11 99 - Servicios Varios</option>
-                                    <option>2.3.1 3.1 1 - Combustibles y Carburantes</option>
-                                    <option>2.3.2 4.1 5 - Mantenimiento de Maquinaria</option>
-                                </select>
-                            </div>
-                            <div class="md:col-span-2">
-                                <label class="block font-medium text-slate-700 mb-1">Descripción del Requerimiento</label>
-                                <input type="text" value="Alquiler de Excavadora sobre orugas 210 HP para descolmatación" class="w-full border border-slate-300 rounded p-2">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Rango 8 UIT (Autocálculo)</label>
-                                <input type="text" value="MAYOR A 8 UIT (Convocatoria)" class="w-full border border-amber-300 bg-amber-50 text-amber-900 rounded p-2 font-bold" readonly>
-                            </div>
-                        </div>
+function kpi(t, v, sub, icon) {
+  return `<div class="bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+    <div class="text-[10px] text-slate-500 uppercase font-semibold flex justify-between"><span>${t}</span><i class="fa-solid ${icon} text-slate-400"></i></div>
+    <div class="text-xl font-bold text-slate-800 my-0.5 num" style="text-align:left">${v}</div>
+    <div class="text-[11px] text-slate-500">${sub}</div></div>`;
+}
+function renderKpis(F) {
+  const pim = sum(pimFiltrado(), "pim"), hayUbo = !!FILT.ubo;
+  const est = sum(F, "monto_ficha"), cert = sum(F, "certificado"), dev = sum(F, "devengado"), prog = sum(F, "prog_total");
+  const pcs = uniq(F.filter((r) => r.tipo_registro === "Punto crítico").map((r) => r.id_pc)).length;
+  const reqs = uniq(F.map((r) => r.id_req)).length;
+  const meta = DATA.params.meta_pc;
+  $("kpis").innerHTML =
+    kpi("PIM asignado", hayUbo ? "—" : S(pim), hayUbo ? "PIM no se distribuye por UBO" : "RM N° 363-2026-VIVIENDA", "fa-landmark") +
+    kpi("Estimado en fichas", S(est), hayUbo ? "" : pct(est, pim) + " del PIM", "fa-file-invoice-dollar") +
+    kpi("Programado Oct–Dic", S(prog), pct(prog, est) + " de lo estimado", "fa-calendar-days") +
+    kpi("Certificado / Devengado", S(cert) + " / " + S(dev), hayUbo ? "" : pct(dev, pim) + " del PIM devengado", "fa-receipt") +
+    kpi("Puntos críticos", pcs + (FILT.ubo || FILT.mod || FILT.comp || FILT.est ? "" : " / " + meta), (FILT.ubo || FILT.mod || FILT.comp || FILT.est) ? "en la selección" : (meta - pcs > 0 ? "faltan " + (meta - pcs) + " por registrar" : "meta cubierta"), "fa-location-dot") +
+    kpi("Requerimientos", reqs, "ID_REQ distintos", "fa-list-check");
+}
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-3">
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Cantidad</label>
-                                <input type="number" value="180" class="w-full border border-slate-300 rounded p-2">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Tarifa / P.U. (S/)</label>
-                                <input type="number" value="350.00" class="w-full border border-slate-300 rounded p-2">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Monto Estimado Ficha (S/)</label>
-                                <input type="text" value="S/ 63,000.00" class="w-full border border-slate-300 rounded p-2 font-bold bg-slate-100" readonly>
-                            </div>
-                        </div>
-                    </div>
+/* ---- Gráfico presupuestal ---- */
+function porEspecifica(F) {
+  const marco = pimFiltrado(), keys = uniq(DATA.marco.map((m) => m.especifica));
+  return keys.map((k) => {
+    const fr = F.filter((r) => r.especifica === k);
+    return { k, label: ESP_LABEL[k] || k, pim: sum(marco.filter((m) => m.especifica === k), "pim"), est: sum(fr, "monto_ficha"),
+      cert: sum(fr, "certificado"), dev: sum(fr, "devengado"), prog: sum(fr, "prog_total") };
+  }).filter((d) => d.pim || d.est);
+}
+function mk(id, cfg) { if (CHARTS[id]) CHARTS[id].destroy(); CHARTS[id] = new Chart($(id), cfg); }
+const tick = (v) => (Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + " M" : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(0) + " mil" : v);
+function renderPres(F) {
+  const d = porEspecifica(F), hayUbo = !!FILT.ubo;
+  $("notaPim").textContent = hayUbo ? "Con filtro por UBO no se muestra el PIM (se asigna por modalidad y componente)." : "PIM (gris) frente a lo estimado en fichas, certificado y devengado.";
+  const ds = [];
+  if (!hayUbo) ds.push({ label: "PIM", data: d.map((x) => x.pim), backgroundColor: COL.pim });
+  ds.push({ label: "Estimado en fichas", data: d.map((x) => x.est), backgroundColor: COL.est });
+  ds.push({ label: "Certificado", data: d.map((x) => x.cert), backgroundColor: COL.cert });
+  ds.push({ label: "Devengado", data: d.map((x) => x.dev), backgroundColor: COL.dev });
+  mk("chPres", { type: "bar", data: { labels: d.map((x) => x.label), datasets: ds },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, borderRadius: 3,
+      scales: { x: { ticks: { callback: tick }, grid: { color: "#eee" } }, y: { grid: { display: false } } },
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (c) => c.dataset.label + ": " + S(c.parsed.x) } } } } });
+}
+function renderEstados(F) {
+  const orden = DATA.listas["Estado del proceso"].slice().sort();
+  const cab = F.filter((r) => r.id_req && REQINFO[r.id_req] === r);
+  const labels = orden.concat(["Sin estado registrado"]);
+  const vals = labels.map((l) => cab.filter((r) => r._estado === l).length);
+  mk("chEstados", { type: "bar", data: { labels, datasets: [{ label: "Requerimientos", data: vals, backgroundColor: COL.bar }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, borderRadius: 3,
+      scales: { x: { ticks: { precision: 0 }, grid: { color: "#eee" } }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } },
+      plugins: { legend: { display: false } } } });
+}
+function renderTablaEsp(F) {
+  const d = porEspecifica(F), hayUbo = !!FILT.ubo;
+  let h = `<thead class="bg-slate-100 text-slate-700 uppercase text-[10px]"><tr><th class="p-2 text-left">Específica</th><th class="p-2 text-left">Descripción</th>
+    <th class="p-2 num">PIM</th><th class="p-2 num">Estimado fichas</th><th class="p-2 num">PIM sin programar</th><th class="p-2 num">% estimado</th>
+    <th class="p-2 num">Prog. Oct–Dic</th><th class="p-2 num">Certificado</th><th class="p-2 num">Devengado</th></tr></thead><tbody class="divide-y">`;
+  d.forEach((x) => {
+    const sobre = !hayUbo && x.est > x.pim;
+    h += `<tr><td class="p-2 font-mono">${esc(x.k)}</td><td class="p-2">${esc(x.label)}</td><td class="p-2 num">${hayUbo ? "—" : S2(x.pim)}</td>
+      <td class="p-2 num">${S2(x.est)}</td><td class="p-2 num">${hayUbo ? "—" : S2(x.pim - x.est)}</td>
+      <td class="p-2 num">${hayUbo ? "—" : pct(x.est, x.pim)}${sobre ? ' <span class="tag bg-red-100 text-red-800" title="Supera el PIM"><i class="fa-solid fa-triangle-exclamation"></i> sobre PIM</span>' : ""}</td>
+      <td class="p-2 num">${S2(x.prog)}</td><td class="p-2 num">${S2(x.cert)}</td><td class="p-2 num">${S2(x.dev)}</td></tr>`;
+  });
+  const T = (k) => d.reduce((t, x) => t + x[k], 0);
+  h += `<tr class="font-bold bg-slate-50"><td class="p-2" colspan="2">TOTAL</td><td class="p-2 num">${hayUbo ? "—" : S2(T("pim"))}</td><td class="p-2 num">${S2(T("est"))}</td>
+    <td class="p-2 num">${hayUbo ? "—" : S2(T("pim") - T("est"))}</td><td class="p-2 num">${hayUbo ? "—" : pct(T("est"), T("pim"))}</td>
+    <td class="p-2 num">${S2(T("prog"))}</td><td class="p-2 num">${S2(T("cert"))}</td><td class="p-2 num">${S2(T("dev"))}</td></tr></tbody>`;
+  $("tblEsp").innerHTML = h;
+}
+function renderUbo(F) {
+  const ubos = uniq(F.map((r) => r.ubo)).sort();
+  const alertas = issuesDe(F);
+  let h = `<thead class="bg-slate-100 text-slate-700 uppercase text-[10px]"><tr><th class="p-2 text-left">UBO</th><th class="p-2 num">Puntos críticos</th><th class="p-2 num">Requerimientos</th>
+    <th class="p-2 num">Estimado fichas</th><th class="p-2 num">Prog. Oct–Dic</th><th class="p-2 num">Certificado</th><th class="p-2 num">Devengado</th><th class="p-2 num">Observaciones de datos</th></tr></thead><tbody class="divide-y">`;
+  ubos.forEach((u) => {
+    const fr = F.filter((r) => r.ubo === u);
+    h += `<tr><td class="p-2 font-semibold">${esc(u)}</td><td class="p-2 num">${uniq(fr.filter((r) => r.tipo_registro === "Punto crítico").map((r) => r.id_pc)).length}</td>
+      <td class="p-2 num">${uniq(fr.map((r) => r.id_req)).length}</td><td class="p-2 num">${S2(sum(fr, "monto_ficha"))}</td><td class="p-2 num">${S2(sum(fr, "prog_total"))}</td>
+      <td class="p-2 num">${S2(sum(fr, "certificado"))}</td><td class="p-2 num">${S2(sum(fr, "devengado"))}</td><td class="p-2 num">${alertas.filter((a) => a.ubo === u).length}</td></tr>`;
+  });
+  $("tblUbo").innerHTML = h + "</tbody>";
+}
 
-                    <!-- BLOQUE 3: PROCESO LOGISTICO SIGA -->
-                    <div>
-                        <h3 class="text-xs font-bold text-red-800 uppercase tracking-wider mb-3 pb-1 border-b border-slate-200">
-                            3. Gestión Logística (SIGA / SEACE)
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">Estado del Proceso</label>
-                                <select class="w-full border border-slate-300 rounded p-2 bg-slate-50 font-semibold text-emerald-800">
-                                    <option>En Proceso de Indagación</option>
-                                    <option selected>Con Orden de Servicio (O/S)</option>
-                                    <option>Pendiente de Certificado</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">N° Pedido SIGA</label>
-                                <input type="text" value="PED-2026-00432" class="w-full border border-slate-300 rounded p-2 font-mono">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">N° Certificado (CCP)</label>
-                                <input type="text" value="CCP-2026-00891" class="w-full border border-slate-300 rounded p-2 font-mono">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-slate-700 mb-1">N° O/S - Contrato</label>
-                                <input type="text" value="OS-2026-00124" class="w-full border border-slate-300 rounded p-2 font-mono">
-                            </div>
-                        </div>
-                    </div>
+/* ============ Puntos críticos ============ */
+function datosPc(F) {
+  const m = {};
+  // se excluyen las filas sin ID_PC: sin código no se puede agrupar como un punto real (quedan en Calidad de datos)
+  F.filter((r) => r.tipo_registro === "Punto crítico" && r.id_pc).forEach((r) => (m[r.id_pc] = m[r.id_pc] || []).push(r));
+  return Object.entries(m).map(([id, rs]) => {
+    const p = rs.find((r) => r.fila_principal === "Sí") || rs[0];
+    return { id, ubo: p.ubo, lugar: [p.provincia, p.distrito].filter(Boolean).join(" / "), ftr: p.ftr, denom: p.denominacion, mod: p.modalidad,
+      equipos: uniq(rs.map((r) => r.equipo)).join("; "), estado: p.estado_intervencion, avance: p.avance_fisico, nreq: uniq(rs.map((r) => r.id_req)).length,
+      monto: sum(rs, "monto_ficha"), obs: issuesDe(rs).length, rows: rs };
+  }).sort((a, b) => a.id.localeCompare(b.id));
+}
+function renderPc(F) {
+  const q = $("pcBuscar").value.toLowerCase(), all = datosPc(F);
+  const d = all.filter((x) => !q || [x.id, x.lugar, x.ftr, x.equipos, x.denom, x.ubo].join(" ").toLowerCase().includes(q));
+  $("pcResumen").textContent = d.length + " puntos" + (FILT.ubo || FILT.mod || FILT.comp || FILT.est ? " (filtrados)" : " de " + DATA.params.meta_pc + " de meta RM");
+  let h = `<thead class="bg-slate-100 text-slate-700 uppercase text-[10px]"><tr><th class="p-2 text-left">ID</th><th class="p-2 text-left">UBO</th><th class="p-2 text-left">Provincia / Distrito</th>
+    <th class="p-2 text-left">FTR</th><th class="p-2 text-left">Intervención</th><th class="p-2 text-left">Modalidad</th><th class="p-2 text-left">Equipo</th><th class="p-2 text-left">Estado</th>
+    <th class="p-2 num">Avance</th><th class="p-2 num">Req.</th><th class="p-2 num">Estimado (S/)</th><th class="p-2 num">Obs.</th></tr></thead><tbody class="divide-y">`;
+  d.forEach((x) => {
+    h += `<tr class="hover:bg-slate-50 cursor-pointer" data-pc="${esc(x.id)}"><td class="p-2 font-mono font-bold text-blue-700">${esc(x.id)}</td><td class="p-2">${esc(x.ubo)}</td><td class="p-2">${esc(x.lugar)}</td>
+      <td class="p-2">${esc(x.ftr || "—")}</td><td class="p-2 max-w-xs truncate" title="${esc(x.denom)}">${esc(x.denom)}</td><td class="p-2">${esc(x.mod)}</td>
+      <td class="p-2 max-w-[10rem] truncate" title="${esc(x.equipos)}">${esc(x.equipos || "—")}</td><td class="p-2">${esc(x.estado || "—")}</td>
+      <td class="p-2 num">${x.avance == null ? "—" : x.avance + "%"}</td><td class="p-2 num">${x.nreq}</td><td class="p-2 num">${S2(x.monto)}</td>
+      <td class="p-2 num">${x.obs ? `<span class="tag bg-amber-100 text-amber-900">${x.obs}</span>` : "0"}</td></tr>`;
+  });
+  $("tblPc").innerHTML = h + "</tbody>";
+  $("tblPc").querySelectorAll("tr[data-pc]").forEach((tr) => (tr.onclick = () => abrirPc(tr.dataset.pc)));
+}
+function abrirPc(id) {
+  const x = datosPc(ROWS).find((p) => p.id === id); if (!x) return;
+  $("modalTitulo").innerHTML = `${esc(x.id)} · ${esc(x.ubo)} · ${esc(x.lugar)}<div class="font-normal text-slate-600 mt-1">${esc(x.denom)}</div><div class="font-normal text-slate-500">${esc(x.ftr || "sin FTR")}</div>`;
+  let h = `<table class="w-full"><thead class="bg-slate-100 uppercase text-[10px]"><tr><th class="p-2 text-left">ID_REQ</th><th class="p-2 text-left">Componente</th><th class="p-2 text-left">Descripción</th>
+    <th class="p-2 num">Cant.</th><th class="p-2 text-left">Unidad</th><th class="p-2 num">Monto ficha (S/)</th><th class="p-2 text-left">Estado del proceso</th></tr></thead><tbody class="divide-y">`;
+  x.rows.forEach((r) => (h += `<tr><td class="p-2 font-mono">${esc(r.id_req)}</td><td class="p-2">${esc(r.componente)}</td><td class="p-2">${esc(r.descripcion)}</td>
+    <td class="p-2 num">${r.cantidad ?? ""}</td><td class="p-2">${esc(r.unidad)}</td><td class="p-2 num">${S2(r.monto_ficha)}</td><td class="p-2">${esc(r._estado)}</td></tr>`));
+  $("modalCuerpo").innerHTML = h + `</tbody></table>`;
+  $("modal").classList.replace("hidden", "flex");
+}
+$("modalCerrar").onclick = () => $("modal").classList.replace("flex", "hidden");
+$("modal").onclick = (e) => { if (e.target.id === "modal") $("modal").classList.replace("flex", "hidden"); };
+$("pcBuscar").oninput = () => renderPc(filtradas());
 
-                    <!-- BOTONES DE ACCION -->
-                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-200">
-                        <button type="button" class="px-4 py-2 border border-slate-300 text-slate-700 text-xs font-semibold rounded hover:bg-slate-50">Cancelar</button>
-                        <button type="submit" class="px-5 py-2 bg-red-800 hover:bg-red-900 text-white text-xs font-bold rounded shadow">Guardar Requerimiento</button>
-                    </div>
+/* ============ Requerimientos ============ */
+const dias = (f) => (f ? Math.floor((new Date(DATA.params.fecha_corte) - new Date(f)) / 864e5) : null);
+function datosReq(F) {
+  const m = {};
+  F.filter((r) => r.id_req).forEach((r) => (m[r.id_req] = m[r.id_req] || []).push(r));
+  return Object.entries(m).map(([id, rs]) => {
+    const h = REQINFO[id] || rs[0];
+    return { id, comp: uniq(rs.map((r) => r.componente)).join("; "), desc: h.descripcion, nfichas: rs.length, monto: sum(rs, "monto_ficha"),
+      rango: h.rango_8uit, proc: h.procedimiento, estado: h._estado, pedido: h.pedido_siga, area: h.ubicacion_area, mov: h.fecha_ult_mov, dias: dias(h.fecha_ult_mov),
+      ccp: h.ccp, orden: h.orden, prov: h.proveedor, tipo: h.tipo_pedido, ubos: uniq(rs.map((r) => r.ubo)).join(", ") };
+  }).sort((a, b) => a.id.localeCompare(b.id, "es", { numeric: true }));
+}
+let REQ_VISIBLE = [];
+function renderReq(F) {
+  const q = $("reqBuscar").value.toLowerCase();
+  REQ_VISIBLE = datosReq(F).filter((x) => !q || [x.id, x.desc, x.pedido, x.ccp, x.orden, x.prov, x.comp].join(" ").toLowerCase().includes(q));
+  $("reqResumen").textContent = REQ_VISIBLE.length + " requerimientos · " + S(REQ_VISIBLE.reduce((t, x) => t + x.monto, 0));
+  const umbral = DATA.params.dias_max_sin_mov;
+  let h = `<thead class="bg-slate-100 text-slate-700 uppercase text-[10px]"><tr><th class="p-2 text-left">ID_REQ</th><th class="p-2 text-left">Componente</th><th class="p-2 text-left">Descripción</th>
+    <th class="p-2 num">Fichas</th><th class="p-2 num">Monto (S/)</th><th class="p-2 text-left">Rango</th><th class="p-2 text-left">Procedimiento</th><th class="p-2 text-left">Estado</th>
+    <th class="p-2 text-left">Pedido SIGA</th><th class="p-2 text-left">Área</th><th class="p-2 num">Días s/mov.</th><th class="p-2 text-left">CCP</th><th class="p-2 text-left">O/S</th></tr></thead><tbody class="divide-y">`;
+  REQ_VISIBLE.forEach((x) => {
+    const atras = x.dias != null && x.dias > umbral;
+    h += `<tr class="hover:bg-slate-50"><td class="p-2 font-mono font-bold">${esc(x.id)}</td><td class="p-2">${esc(x.comp)}</td><td class="p-2 max-w-xs truncate" title="${esc(x.desc)}">${esc(x.desc)}</td>
+      <td class="p-2 num">${x.nfichas}</td><td class="p-2 num">${S2(x.monto)}</td><td class="p-2">${esc(x.rango || "—")}</td><td class="p-2">${esc(x.proc || "—")}</td><td class="p-2">${esc(x.estado)}</td>
+      <td class="p-2 font-mono">${esc(x.pedido || "—")}</td><td class="p-2">${esc(x.area || "—")}</td>
+      <td class="p-2 num">${x.dias == null ? "—" : atras ? `<span class="tag bg-red-100 text-red-800"><i class="fa-solid fa-clock"></i> ${x.dias} d</span>` : x.dias}</td>
+      <td class="p-2 font-mono">${esc(x.ccp || "—")}</td><td class="p-2 font-mono">${esc(x.orden || "—")}</td></tr>`;
+  });
+  $("tblReq").innerHTML = h + "</tbody>";
+}
+$("reqBuscar").oninput = () => renderReq(filtradas());
 
-                </form>
-            </div>
-        </section>
+/* ============ Calidad de datos ============ */
+const TIPOS = [
+  ["Fila sin ID_REQ", "critico", "Tiene punto crítico y monto pero no número de requerimiento: no entra en el seguimiento del proceso"],
+  ["Punto crítico sin ID_PC", "critico", "Fila de intervención sin código R-xx/D-xx: no se cuenta como punto crítico ni aparece en la pestaña Puntos críticos"],
+  ["Sin monto estimado", "critico", "Fila de requerimiento sin monto en la ficha"],
+  ["Sin programación mensual", "atencion", "Tiene monto pero no se programó Oct–Dic"],
+  ["Requerimiento sin estado", "atencion", "Fila cabecera sin estado del proceso"],
+  ["Requerimiento sin procedimiento", "atencion", "Fila cabecera sin procedimiento"],
+  ["Punto crítico sin FTR", "critico", "Fila principal sin ficha técnica"],
+  ["Montos inconsistentes", "critico", "Comprometido > certificado, devengado > comprometido o certificado > estimado"],
+  ["Supera el PIM", "critico", "Estimado del componente mayor al PIM asignado"],
+  ["Sin movimiento", "atencion", "Más días sin movimiento que el umbral de PARAMETROS"],
+];
+function issuesDe(F) {
+  const out = [], umbral = DATA.params.dias_max_sin_mov;
+  const add = (tipo, r, det) => out.push({ tipo, id_req: r.id_req, id_pc: r.id_pc, ubo: r.ubo, usuario: r.actualizado_por || "—", det });
+  F.forEach((r) => {
+    if (r.tipo_registro === "Punto crítico" && !r.id_pc) add("Punto crítico sin ID_PC", r, (r.denominacion || r.componente || "") + " · " + (r.ubo || ""));
+    if (!r.id_req) { if (r.id_pc) add("Fila sin ID_REQ", r, (r.componente || "") + " · " + S2(r.monto_ficha)); return; }
+    if (!(r.monto_ficha > 0)) add("Sin monto estimado", r, r.descripcion || r.componente);
+    else if (!(r.prog_total > 0)) add("Sin programación mensual", r, S2(r.monto_ficha) + " sin distribuir");
+    if (REQINFO[r.id_req] === r) {
+      if (!r.estado_proceso) add("Requerimiento sin estado", r, r.descripcion);
+      if (!r.procedimiento && r.estado_proceso && r.estado_proceso.slice(0, 2) >= "02") add("Requerimiento sin procedimiento", r, "Estado: " + r.estado_proceso);
+      const d = dias(r.fecha_ult_mov), fin = ["10", "11", "12", "00"].includes((r.estado_proceso || "").slice(0, 2));
+      if (d != null && d > umbral && !fin) add("Sin movimiento", r, d + " días desde " + r.fecha_ult_mov);
+    }
+    if (r.tipo_registro === "Punto crítico" && r.fila_principal === "Sí" && !r.ftr) add("Punto crítico sin FTR", r, r.denominacion);
+    const c = r.certificado || 0, co = r.comprometido || 0, dv = r.devengado || 0;
+    if (c > (r.monto_ficha || 0) + 0.005 || co > c + 0.005 || dv > co + 0.005) add("Montos inconsistentes", r, `Est. ${S2(r.monto_ficha)} · Cert. ${S2(c)} · Comp. ${S2(co)} · Dev. ${S2(dv)}`);
+  });
+  return out;
+}
+function sobrePim() {  // usa todas las filas: el PIM no se reparte por UBO
+  return DATA.marco.filter((m) => sum(ROWS.filter((r) => r.modalidad === m.modalidad && r.componente === m.componente), "monto_ficha") > m.pim + 0.5)
+    .map((m) => ({ tipo: "Supera el PIM", id_req: "—", id_pc: "—", ubo: "—", usuario: "—",
+      det: `${m.modalidad} · ${m.componente}: estimado ${S2(sum(ROWS.filter((r) => r.modalidad === m.modalidad && r.componente === m.componente), "monto_ficha"))} vs PIM ${S2(m.pim)}` }));
+}
+function renderCalidad(F) {
+  ISSUES = issuesDe(F).concat(FILT.ubo ? [] : sobrePim());
+  const cnt = {}; ISSUES.forEach((i) => (cnt[i.tipo] = (cnt[i.tipo] || 0) + 1));
+  $("calCards").innerHTML = TIPOS.map(([t, sev, desc]) => {
+    const n = cnt[t] || 0, crit = sev === "critico";
+    const etiqueta = n === 0 ? `<span class="tag bg-emerald-100 text-emerald-800"><i class="fa-solid fa-check"></i> Sin observaciones</span>`
+      : crit ? `<span class="tag bg-red-100 text-red-800"><i class="fa-solid fa-circle-exclamation"></i> Crítico</span>` : `<span class="tag bg-amber-100 text-amber-900"><i class="fa-solid fa-triangle-exclamation"></i> Atención</span>`;
+    return `<button data-t="${esc(t)}" class="calcard text-left bg-white p-3 rounded-lg shadow-sm border border-slate-200 hover:border-slate-400">
+      <div class="flex justify-between items-start"><div class="text-2xl font-bold num" style="text-align:left">${n}</div>${etiqueta}</div>
+      <div class="text-xs font-semibold text-slate-800 mt-1">${esc(t)}</div><div class="text-[11px] text-slate-500">${esc(desc)}</div></button>`;
+  }).join("");
+  document.querySelectorAll(".calcard").forEach((b) => (b.onclick = () => { $("calTipo").value = b.dataset.t; renderCalDetalle(); }));
+  const porU = {}; ISSUES.forEach((i) => i.usuario !== "—" && (porU[i.usuario] = (porU[i.usuario] || 0) + 1));
+  $("tblUsr").innerHTML = `<thead class="bg-slate-100 uppercase text-[10px]"><tr><th class="p-2 text-left">Usuario</th><th class="p-2 num">Obs.</th></tr></thead><tbody class="divide-y">` +
+    Object.entries(porU).sort((a, b) => b[1] - a[1]).map(([u, n]) => `<tr><td class="p-2">${esc(u)}</td><td class="p-2 num">${n}</td></tr>`).join("") + "</tbody>";
+  const cur = $("calTipo").value;
+  $("calTipo").innerHTML = `<option value="">Todas (${ISSUES.length})</option>` + TIPOS.map(([t]) => `<option ${t === cur ? "selected" : ""} value="${esc(t)}">${esc(t)} (${cnt[t] || 0})</option>`).join("");
+  renderCalDetalle();
+}
+function calFiltradas() { const t = $("calTipo").value; return ISSUES.filter((i) => !t || i.tipo === t); }
+function renderCalDetalle() {
+  const d = calFiltradas();
+  $("tblCal").innerHTML = `<thead class="bg-slate-100 uppercase text-[10px]"><tr><th class="p-2 text-left">Observación</th><th class="p-2 text-left">ID_REQ</th><th class="p-2 text-left">ID_PC</th><th class="p-2 text-left">UBO</th><th class="p-2 text-left">Detalle</th><th class="p-2 text-left">Usuario</th></tr></thead><tbody class="divide-y">` +
+    d.slice(0, 400).map((i) => `<tr><td class="p-2">${esc(i.tipo)}</td><td class="p-2 font-mono">${esc(i.id_req)}</td><td class="p-2 font-mono">${esc(i.id_pc)}</td><td class="p-2">${esc(i.ubo)}</td><td class="p-2 max-w-sm truncate" title="${esc(i.det)}">${esc(i.det)}</td><td class="p-2">${esc(i.usuario)}</td></tr>`).join("") +
+    (d.length > 400 ? `<tr><td class="p-2 text-slate-500" colspan="6">Se muestran 400 de ${d.length}. Exporte a Excel para ver todas.</td></tr>` : "") + "</tbody>";
+}
+$("calTipo").onchange = renderCalDetalle;
 
-        <!-- VISTA 3: MATRIZ DATA MASTER -->
-        <section id="view-matriz" class="hidden space-y-4">
-            <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
-                <h3 class="text-xs font-bold text-slate-700 uppercase mb-3">Registros de la Matriz (Consolidado 55 Puntos Críticos)</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left text-slate-600">
-                        <thead class="bg-slate-100 text-slate-700 uppercase text-[10px] border-b">
-                            <tr>
-                                <th class="p-2.5">ID_REQ</th>
-                                <th class="p-2.5">Ficha FTR</th>
-                                <th class="p-2.5">Ubicación</th>
-                                <th class="p-2.5">Requerimiento</th>
-                                <th class="p-2.5">Monto (S/)</th>
-                                <th class="p-2.5">Estado SIGA</th>
-                                <th class="p-2.5">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200">
-                            <tr>
-                                <td class="p-2.5 font-bold text-slate-800">REQ-001</td>
-                                <td class="p-2.5 font-mono text-blue-700">FTR-055</td>
-                                <td class="p-2.5">Piura / Sullana</td>
-                                <td class="p-2.5">Alquiler de Excavadora 210 HP</td>
-                                <td class="p-2.5 font-bold">63,000.00</td>
-                                <td class="p-2.5"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">O/S Emitida</span></td>
-                                <td class="p-2.5"><button onclick="switchTab('formulario')" class="text-blue-600 hover:underline"><i class="fa-solid fa-pen"></i> Editar</button></td>
-                            </tr>
-                            <tr>
-                                <td class="p-2.5 font-bold text-slate-800">REQ-002</td>
-                                <td class="p-2.5 font-mono text-blue-700">FTR-056</td>
-                                <td class="p-2.5">Lambayeque / Chiclayo</td>
-                                <td class="p-2.5">Adquisición de Diésel B5 S-50</td>
-                                <td class="p-2.5 font-bold">24,500.00</td>
-                                <td class="p-2.5"><span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">En Indagación</span></td>
-                                <td class="p-2.5"><button onclick="switchTab('formulario')" class="text-blue-600 hover:underline"><i class="fa-solid fa-pen"></i> Editar</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
+/* ============ Exportar a Excel ============ */
+function bajar(nombre, hojas) {
+  const wb = XLSX.utils.book_new();
+  hojas.forEach(([n, filas]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), n.slice(0, 31)));
+  XLSX.writeFile(wb, nombre + "_" + DATA.params.fecha_corte + ".xlsx");
+}
+$("btnExcel").onclick = () => {
+  const F = filtradas();
+  bajar("Seguimiento_FEN", [
+    ["Requerimientos", datosReq(F).map((x) => ({ ID_REQ: x.id, Componente: x.comp, Descripcion: x.desc, Fichas: x.nfichas, Monto: x.monto, Rango: x.rango, Procedimiento: x.proc, Estado: x.estado, Pedido_SIGA: x.pedido, Area: x.area, Dias_sin_mov: x.dias, CCP: x.ccp, OS: x.orden, Proveedor: x.prov }))],
+    ["Puntos_criticos", datosPc(F).map((x) => ({ ID_PC: x.id, UBO: x.ubo, Lugar: x.lugar, FTR: x.ftr, Intervencion: x.denom, Modalidad: x.mod, Equipos: x.equipos, Estado: x.estado, Avance: x.avance, Requerimientos: x.nreq, Estimado: x.monto, Observaciones: x.obs }))],
+    ["Por_especifica", porEspecifica(F).map((x) => ({ Especifica: x.k, Descripcion: x.label, PIM: x.pim, Estimado: x.est, Prog_Oct_Dic: x.prog, Certificado: x.cert, Devengado: x.dev }))],
+    ["Observaciones", ISSUES.map((i) => ({ Observacion: i.tipo, ID_REQ: i.id_req, ID_PC: i.id_pc, UBO: i.ubo, Detalle: i.det, Usuario: i.usuario }))],
+  ]);
+};
+$("calExcel").onclick = () => bajar("Observaciones_FEN", [["Observaciones", calFiltradas().map((i) => ({ Observacion: i.tipo, ID_REQ: i.id_req, ID_PC: i.id_pc, UBO: i.ubo, Detalle: i.det, Usuario: i.usuario }))]]);
 
-    </main>
+/* ============ Pestañas ============ */
+const TABS = [["resumen", "fa-chart-pie", "Resumen ejecutivo"], ["pc", "fa-location-dot", "Puntos críticos"], ["req", "fa-list-check", "Requerimientos"], ["cal", "fa-clipboard-check", "Calidad de datos"]];
+function pintarTabs() {
+  $("tabs").innerHTML = TABS.map(([k, ic, t]) => `<button data-k="${k}" class="px-4 py-2.5 text-xs font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap ${k === TAB ? "text-white border-white bg-red-900/40" : "text-red-200 hover:text-white border-transparent"}"><i class="fa-solid ${ic}"></i> ${t}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach((b) => (b.onclick = () => { TAB = b.dataset.k; pintarTabs(); mostrar(); }));
+}
+function mostrar() { TABS.forEach(([k]) => $("tab-" + k).classList.toggle("hidden", k !== TAB)); $("filtros").classList.toggle("hidden", TAB === "cal" && false); }
+$("btnRefrescar").onclick = () => { DATA = null; cargar(); };
 
-    <script>
-        // NAVEGACION DE VISTAS
-        function switchTab(view) {
-            document.getElementById('view-dashboard').classList.add('hidden');
-            document.getElementById('view-formulario').classList.add('hidden');
-            document.getElementById('view-matriz').classList.add('hidden');
-
-            document.getElementById('nav-dashboard').className = "px-4 py-2.5 text-xs font-semibold text-red-200 hover:text-white border-b-2 border-transparent flex items-center gap-2";
-            document.getElementById('nav-formulario').className = "px-4 py-2.5 text-xs font-semibold text-red-200 hover:text-white border-b-2 border-transparent flex items-center gap-2";
-            document.getElementById('nav-matriz').className = "px-4 py-2.5 text-xs font-semibold text-red-200 hover:text-white border-b-2 border-transparent flex items-center gap-2";
-
-            document.getElementById('view-' + view).classList.remove('hidden');
-            const activeNav = document.getElementById('nav-' + view);
-            activeNav.className = "px-4 py-2.5 text-xs font-semibold text-white border-b-2 border-white flex items-center gap-2 bg-red-900/40";
-        }
-
-        // CHARTS DE EJEMPLO
-        window.onload = function() {
-            // Bar Chart
-            const ctx1 = document.getElementById('chartPresupuesto').getContext('2d');
-            new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: ['Servicios Varios', 'Combustibles', 'Mantenimiento', 'Adquisiciones'],
-                    datasets: [{
-                        label: 'Certificado (S/)',
-                        data: [12500000, 3200000, 1800000, 840000],
-                        backgroundColor: '#8B1D24'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            // Pie Chart
-            const ctx2 = document.getElementById('chartEstados').getContext('2d');
-            new Chart(ctx2, {
-                type: 'doughnut',
-                data: {
-                    labels: ['O/S Contratado', 'En Indagación', 'Pendiente Requerimiento'],
-                    datasets: [{
-                        data: [65, 25, 10],
-                        backgroundColor: ['#059669', '#D97706', '#DC2626']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-    </script>
+pintarTabs(); mostrar();
+cargar().catch((e) => { $("aviso").textContent = "Error cargando datos: " + e.message; $("aviso").classList.remove("hidden"); });
+if (CFG.API_URL && CFG.REFRESH_MIN > 0) setInterval(() => { if (!document.hidden) cargar(); }, CFG.REFRESH_MIN * 60000);
+</script>
 </body>
 </html>
